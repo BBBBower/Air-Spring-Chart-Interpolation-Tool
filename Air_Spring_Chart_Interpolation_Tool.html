@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Force Interpolation Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 25px;
+            font-size: 14px;
+        }
+        
+        .input-section {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            resize: vertical;
+            transition: border-color 0.3s;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+        
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            flex: 1;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 25px;
+            background: #fafafa;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        
+        .results-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .results-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+        }
+        
+        tr:hover {
+            background: #f0f0f0;
+        }
+        
+        .error {
+            background: #fee;
+            border: 2px solid #fcc;
+            color: #c33;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .info {
+            background: #e3f2fd;
+            border: 2px solid #90caf9;
+            color: #1565c0;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Nonlinear Force Interpolation Tool</h1>
+        <p class="subtitle">Progressive force curve analysis using monotonic spline interpolation</p>
+        
+        <div class="input-section">
+            <label for="dataInput">Paste your data (format: x, y per line):</label>
+            <textarea id="dataInput" placeholder="126.62824207492795, 500.3472222222222
+95.15850144092218, 200.13888888888889
+70.05763688760807, 107.70833333333333
+41.33525456292027, 48.125
+114.8895292987512, 339.16666666666663"></textarea>
+        </div>
+        
+        <div class="input-section">
+            <div style="display: flex; gap: 20px;">
+                <div style="flex: 1;">
+                    <label for="minRange">Minimum Travel (mm):</label>
+                    <input type="number" id="minRange" value="0" min="0" style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                </div>
+                <div style="flex: 1;">
+                    <label for="maxRange">Maximum Travel (mm):</label>
+                    <input type="number" id="maxRange" value="130" min="1" style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                </div>
+            </div>
+        </div>
+        
+        <div class="button-group">
+            <button class="btn-primary" onclick="processData()">Calculate & Plot</button>
+            <button class="btn-secondary" onclick="exportCSV()">Export CSV</button>
+            <button class="btn-secondary" onclick="copyTable(event)">Copy Table</button>
+        </div>
+        
+        <div id="messageArea"></div>
+        
+        <div class="chart-container">
+            <canvas id="forceChart"></canvas>
+        </div>
+        
+        <div class="results-section" id="resultsSection" style="display: none;">
+            <h3>Interpolated Force Values (every 1mm)</h3>
+            <div id="resultsTable"></div>
+        </div>
+    </div>
+
+    <script>
+        let chart = null;
+        let interpolatedData = [];
+        
+        function monotonicSplineInterpolation(points) {
+            // Sort points by x
+            points.sort((a, b) => a.x - b.x);
+            
+            const n = points.length;
+            const x = points.map(p => p.x);
+            const y = points.map(p => p.y);
+            
+            // Calculate slopes
+            const delta = [];
+            for (let i = 0; i < n - 1; i++) {
+                delta[i] = (y[i + 1] - y[i]) / (x[i + 1] - x[i]);
+            }
+            
+            // Calculate tangents using monotonic method
+            const m = [delta[0]];
+            for (let i = 1; i < n - 1; i++) {
+                if (delta[i - 1] * delta[i] <= 0) {
+                    m[i] = 0;
+                } else {
+                    m[i] = (delta[i - 1] + delta[i]) / 2;
+                }
+            }
+            m[n - 1] = delta[n - 2];
+            
+            // Adjust tangents to ensure monotonicity
+            for (let i = 0; i < n - 1; i++) {
+                if (Math.abs(delta[i]) < 1e-10) {
+                    m[i] = 0;
+                    m[i + 1] = 0;
+                } else {
+                    const alpha = m[i] / delta[i];
+                    const beta = m[i + 1] / delta[i];
+                    const tau = alpha * alpha + beta * beta;
+                    if (tau > 9) {
+                        const t = 3 / Math.sqrt(tau);
+                        m[i] = t * alpha * delta[i];
+                        m[i + 1] = t * beta * delta[i];
+                    }
+                }
+            }
+            
+            return { x, y, m, n };
+        }
+        
+        function evaluateMonotonicSpline(spline, xVal) {
+            const { x, y, m, n } = spline;
+            
+            // Find the interval
+            let i = 0;
+            if (xVal <= x[0]) {
+                // Extrapolate before first point using power law
+                const ratio = xVal / x[0];
+                if (ratio <= 0) return 0;
+                return y[0] * Math.pow(ratio, 2);
+            }
+            if (xVal >= x[n - 1]) {
+                // Extrapolate after last point using power law
+                i = n - 2;
+                const dx = x[n - 1] - x[n - 2];
+                const dy = y[n - 1] - y[n - 2];
+                const slope = dy / dx;
+                const extraDist = xVal - x[n - 1];
+                // Use progressive extrapolation
+                const acceleration = slope / dx;
+                return y[n - 1] + slope * extraDist + 0.5 * acceleration * extraDist * extraDist;
+            }
+            
+            for (i = 0; i < n - 1; i++) {
+                if (xVal <= x[i + 1]) break;
+            }
+            
+            // Hermite interpolation
+            const h = x[i + 1] - x[i];
+            const t = (xVal - x[i]) / h;
+            const t2 = t * t;
+            const t3 = t2 * t;
+            
+            const h00 = 2 * t3 - 3 * t2 + 1;
+            const h10 = t3 - 2 * t2 + t;
+            const h01 = -2 * t3 + 3 * t2;
+            const h11 = t3 - t2;
+            
+            return h00 * y[i] + h10 * h * m[i] + h01 * y[i + 1] + h11 * h * m[i + 1];
+        }
+        
+        function parseData(text) {
+            const lines = text.trim().split('\n');
+            const points = [];
+            
+            for (let line of lines) {
+                line = line.trim();
+                if (!line || line.toLowerCase().startsWith('x')) continue;
+                
+                const parts = line.split(',').map(s => parseFloat(s.trim()));
+                if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                    points.push({ x: parts[0], y: parts[1] });
+                }
+            }
+            
+            return points;
+        }
+        
+        function powerLawRegression(points) {
+            // For air spring: F = a * x^b
+            // As travel (x) increases, force (F) increases progressively
+            // Log transformation: log(F) = log(a) + b*log(x)
+            
+            const validPoints = points.filter(p => p.x > 0 && p.y > 0);
+            
+            if (validPoints.length < 2) {
+                throw new Error('Need at least 2 valid positive data points');
+            }
+            
+            // Log transformation
+            const logX = validPoints.map(p => Math.log(p.x));
+            const logY = validPoints.map(p => Math.log(p.y));
+            
+            // Linear regression on log-transformed data
+            const n = logX.length;
+            const sumLogX = logX.reduce((a, b) => a + b, 0);
+            const sumLogY = logY.reduce((a, b) => a + b, 0);
+            const sumLogXY = logX.reduce((sum, lx, i) => sum + lx * logY[i], 0);
+            const sumLogX2 = logX.reduce((sum, lx) => sum + lx * lx, 0);
+            
+            const b = (n * sumLogXY - sumLogX * sumLogY) / (n * sumLogX2 - sumLogX * sumLogX);
+            const logA = (sumLogY - b * sumLogX) / n;
+            const a = Math.exp(logA);
+            
+            return { a, b, type: 'power' };
+        }
+        
+
+        
+        function evaluatePowerLaw(params, x) {
+            // F = a * x^b
+            if (x <= 0) return 0;
+            const result = params.a * Math.pow(x, params.b);
+            return isNaN(result) || !isFinite(result) ? 0 : result;
+        }
+        
+        function processData() {
+            const input = document.getElementById('dataInput').value;
+            const messageArea = document.getElementById('messageArea');
+            messageArea.innerHTML = '';
+            
+            try {
+                const points = parseData(input);
+                
+                if (points.length < 3) {
+                    throw new Error('Need at least 3 data points for interpolation');
+                }
+                
+                // Sort points by x value
+                points.sort((a, b) => a.x - b.x);
+                
+                // Get user-specified range
+                const minX = parseInt(document.getElementById('minRange').value);
+                const maxX = parseInt(document.getElementById('maxRange').value);
+                
+                if (isNaN(minX) || isNaN(maxX) || maxX <= minX) {
+                    throw new Error('Invalid range: Maximum must be greater than minimum');
+                }
+                
+                // Perform monotonic spline interpolation (passes through all points exactly)
+                const spline = monotonicSplineInterpolation(points);
+                
+                console.log('Spline created with', points.length, 'control points');
+                
+                // Generate interpolated values for every mm
+                interpolatedData = [];
+                for (let x = minX; x <= maxX; x++) {
+                    const y = evaluateMonotonicSpline(spline, x);
+                    interpolatedData.push({ x, y: Math.max(0, y) }); // Force cannot be negative
+                }
+                
+                console.log('Interpolated data sample:', JSON.stringify(interpolatedData.slice(0, 10)));
+                console.log('Value at x=130:', interpolatedData[130].y);
+                console.log('Total interpolated points:', interpolatedData.length);
+                
+                messageArea.innerHTML = `<div class="info">Successfully processed ${points.length} data points. Generated ${interpolatedData.length} interpolated values.</div>`;
+                
+                // Create chart
+                createChart(points, interpolatedData);
+                
+                // Display results table
+                displayResults(interpolatedData);
+                
+            } catch (error) {
+                messageArea.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+        
+        function createChart(originalPoints, interpolated) {
+            const ctx = document.getElementById('forceChart').getContext('2d');
+            
+            if (chart) {
+                chart.destroy();
+            }
+            
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Interpolated Force Curve',
+                            data: interpolated.map(p => ({ x: p.x, y: p.y })),
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            tension: 0
+                        },
+                        {
+                            label: 'Original Data Points',
+                            data: originalPoints.map(p => ({ x: p.x, y: p.y })),
+                            borderColor: '#764ba2',
+                            backgroundColor: '#764ba2',
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                            showLine: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'nearest',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: {
+                                display: true,
+                                text: 'Travel (mm)',
+                                font: { size: 14, weight: 'bold' }
+                            },
+                            grid: { color: '#e0e0e0' }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Force',
+                                font: { size: 14, weight: 'bold' }
+                            },
+                            grid: { color: '#e0e0e0' },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+        
+        function displayResults(data) {
+            const resultsSection = document.getElementById('resultsSection');
+            const resultsTable = document.getElementById('resultsTable');
+            
+            let html = '<table><thead><tr><th>Travel (mm)</th><th>Force</th></tr></thead><tbody>';
+            
+            for (let point of data) {
+                html += `<tr><td>${point.x.toFixed(2)}</td><td>${point.y.toFixed(4)}</td></tr>`;
+            }
+            
+            html += '</tbody></table>';
+            resultsTable.innerHTML = html;
+            resultsSection.style.display = 'block';
+        }
+        
+        function exportCSV() {
+            if (interpolatedData.length === 0) {
+                alert('Please calculate data first before exporting');
+                return;
+            }
+            
+            let csv = 'Travel (mm),Force\n';
+            for (let point of interpolatedData) {
+                csv += `${point.x.toFixed(2)},${point.y.toFixed(4)}\n`;
+            }
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'force_interpolation.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+        function copyTable(event) {
+            if (interpolatedData.length === 0) {
+                alert('Please calculate data first before copying');
+                return;
+            }
+            
+            let text = 'Travel (mm)\tForce\n';
+            for (let point of interpolatedData) {
+                text += `${point.x.toFixed(2)}\t${point.y.toFixed(4)}\n`;
+            }
+            
+            navigator.clipboard.writeText(text).then(() => {
+                // Show temporary success message
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                btn.style.background = '#4caf50';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = '';
+                }, 2000);
+            }).catch(err => {
+                alert('Failed to copy to clipboard: ' + err);
+            });
+        }
+    </script>
+</body>
+</html>
